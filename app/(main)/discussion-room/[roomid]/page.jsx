@@ -1,23 +1,20 @@
 "use client"
-import React,{useState,useRef,useEffect} from 'react'
-import { useParams } from 'next/navigation'
-import { useQuery } from 'convex/react';
-import dynamic from "next/dynamic";
-//import { getToken } from "@/services/GlobalServices";
+import { Button } from '@/components/ui/button'
 import { api } from '@/convex/_generated/api';
 import { CoachingExpert } from '@/services/Option'
-import Image from 'next/image';
 import { UserButton } from '@stackframe/stack'
-import { Button } from '@/components/ui/button'
-//import { AssemblyAI, RealtimeTranscriber } from "assemblyai";
+import { useQuery } from 'convex/react';
+import Image from 'next/image';
+import { useParams } from 'next/navigation'
+import React,{useState,useRef,useEffect} from 'react'
 
-// Use dynamic import with SSR disabled
-const RecordRTC = dynamic(
-  () => import("recordrtc").then((mod) => mod.default || mod),
-  {
-    ssr: false,
-  }
-);
+
+
+import RecordRTC from 'recordrtc';
+
+
+
+
 
 
 function DiscussionRoom() {
@@ -29,19 +26,8 @@ function DiscussionRoom() {
   const [expert, setExpert] = useState();
   const [enableMic, setEnableMic] = useState(false);
   const recorder = useRef(null);
-  const silenceTimeout = useRef(null);
-  const realtimeTranscriber = useRef(null);
+  
 
-  useEffect(() => {
-    return () => {
-      // Cleanup on unmount
-      if (silenceTimeout.current) clearTimeout(silenceTimeout.current);
-      if (recorder.current) {
-        recorder.current.stopRecording();
-        recorder.current = null;
-      }
-    };
-  }, []);
 
 
 
@@ -54,78 +40,49 @@ function DiscussionRoom() {
 
   },[DiscussionRoomData])
 
-const connectToServer= async() => {
-  //paste "https://github.com/Daniriatu/ai-coaching-voice-agent/blob/main/app/(main)/discussion-room/%5Broomid%5D/page.jsx"
-  try {
-    setEnableMic(true);
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    // Initialize Assembly AI
-    // realtimeTranscriber.current = new RealtimeTranscriber({
-    //   token: await getToken,
-    //   sample_rate: 16_000,
-    // });
-
-    // realtimeTranscriber.current.on("transcript", async (transcript) => {
-    //   console.log(transcript);
-    // });
-
-    // await realtimeTranscriber.current.connect();
-
-    // Initialize RecordRTC
-    const { default: RecordRTC } = await import("recordrtc");
-
-    recorder.current = new RecordRTC(stream, {
-      type: "audio",
-      mimeType: "audio/webm",
-      timeSlice: 250,
-      desiredSampRate: 16000,
-      numberOfAudioChannels: 1,
-      ondataavailable: async (blob) => {
-        if (silenceTimeout.current) clearTimeout(silenceTimeout.current);
-
-        try {
-          const buffer = await blob.arrayBuffer();
-          console.log("Audio chunk:", buffer);
-
-          silenceTimeout.current = setTimeout(() => {
-            console.log("User stopped talking");
-          }, 2000);
-        } catch (error) {
-          console.error("Blob processing error:", error);
-        }
-      },
-    });
-
-    // Start recording
-    recorder.current.startRecording();
-    console.log("Recording started");
-  } catch (error) {
-    console.error("Recording setup failed:", error);
-    setEnableMic(false);
-  }
+const connectToServer= () => {
+  setEnableMic(true);
+  if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+        .then((stream) => {
+            recorder.current = new RecordRTC(stream, {
+                type: 'audio',
+                mimeType: 'audio/webm;codecs=pcm',
+                recorderType: RecordRTC.StereoAudioRecorder,
+                timeSlice: 250,
+                desiredSampleRate: 16000,
+                numberOfAudioChannels: 1,
+                bufferSize: 4096,
+                audioBitsPerSecond: 128000,
+                ondataavailable: async (blob) => {
+                    //if (!realtimeTranscriber.current) return;
+                    
+                    // Reset the silence detection timer on audio input
+                    clearTimeout(silenceTimeout);
+                    const buffer = await blob.arrayBuffer();
+                    
+                    // Restart the silence detection timer
+                    silenceTimeout = setTimeout(() => {
+                        console.log('User stopped talking');
+                        // Handle user stopped talking (e.g., send final transcript, stop recording, etc.)
+                    }, 2000);
+                }
+            });
+            recorder.current.startRecording();
+        })
+        .catch((err) => {
+            console.error('Error accessing microphone:', err);
+        });
+   }
 };
 
 const disconnect = (e) => {
   e.preventDefault();
-  try {
-    if (recorder.current) {
-      console.log("Stopping recording...");
-      recorder.current.stopRecording(() => {
-        console.log("Recording stopped");
-        if (recorder.current.getBlob()) {
-          console.log("Final blob:", recorder.current.getBlob());
-        }
-        recorder.current.destroy();
-        recorder.current = null;
-      });
-    }
-  } catch (error) {
-    console.error("Disconnection error:", error);
-  } finally {
-    setEnableMic(false);
-  }
+  
+  recorder.current.pauseRecording(); 
+  recorder.current = null;
+  setEnableMic(false);
+        
 };
  
 
