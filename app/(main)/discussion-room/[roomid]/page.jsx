@@ -4,13 +4,15 @@ import { api } from '@/convex/_generated/api';
 import { CoachingExpert } from '@/services/Option'
 import { UserButton } from '@stackframe/stack'
 import { useQuery } from 'convex/react';
+import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { useParams } from 'next/navigation'
 import React,{useState,useRef,useEffect} from 'react'
 
 
 
-import RecordRTC from 'recordrtc';
+//import RecordRTC from 'recordrtc';
+//const RecordRTC = dynamic(() => import('recordrtc'),{ssr:false})
 
 
 
@@ -26,6 +28,7 @@ function DiscussionRoom() {
   const [expert, setExpert] = useState();
   const [enableMic, setEnableMic] = useState(false);
   const recorder = useRef(null);
+  let silenceTimeout
   
 
 
@@ -40,9 +43,10 @@ function DiscussionRoom() {
 
   },[DiscussionRoomData])
 
-const connectToServer= () => {
+const connectToServer= async () => {
   setEnableMic(true);
   if (typeof window !== "undefined" && typeof navigator !== "undefined") {
+    const { default: RecordRTC } = await import('recordrtc'); // ✅ Correct dynamic import
     navigator.mediaDevices.getUserMedia({ audio: true })
         .then((stream) => {
             recorder.current = new RecordRTC(stream, {
@@ -60,7 +64,7 @@ const connectToServer= () => {
                     // Reset the silence detection timer on audio input
                     clearTimeout(silenceTimeout);
                     const buffer = await blob.arrayBuffer();
-                    
+                    console.log(buffer)
                     // Restart the silence detection timer
                     silenceTimeout = setTimeout(() => {
                         console.log('User stopped talking');
@@ -68,6 +72,7 @@ const connectToServer= () => {
                     }, 2000);
                 }
             });
+            console.log("recorder.current--",recorder.current);
             recorder.current.startRecording();
         })
         .catch((err) => {
